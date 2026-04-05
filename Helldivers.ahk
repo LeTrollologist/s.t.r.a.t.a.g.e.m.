@@ -2,9 +2,10 @@
 #SingleInstance Force
 CoordMode("ToolTip", "Screen")
 SetWorkingDir(A_ScriptDir)
+DllCall("SetProcessDPIAware")
 
 ; ============================================================
-;  S.T.R.A.T.A.G.E.M. TERMINAL  v4.7
+;  S.T.R.A.T.A.G.E.M. TERMINAL  v4.8.6
 ;  Smart Trigger Regulation And Tactical Action
 ;  Guidance Execution Manager
 ;
@@ -30,6 +31,9 @@ global HUDVisible  := true
 global CompactMode := false
 global ActiveSlot  := 0
 global ActiveStep  := 0
+global CompactX    := -1   ; saved compact overlay X position (v4.8.2)
+global CompactY    := -1   ; saved compact overlay Y position (v4.8.2)
+global LabelEdits  := []   ; display name override Edit controls (v4.8.4)
 
 ; Transparency constants
 global TR_FULL := 230
@@ -210,9 +214,9 @@ KeysForName(name) {
 
 BuildHUDLine(slot, name, seq, activeStep := 0) {
     arrows    := StrSplit(seq, ",")
-    label     := Format("{:2}", slot = 0 ? "0" : slot)
-    nameTrunc := StrLen(name) > 16 ? SubStr(name, 1, 15) "~" : name
-    namePad   := Format("{:-16s}", nameTrunc)
+    label     := (slot = 0) ? " C+0" : "C+" slot
+    nameTrunc := StrLen(name) > 15 ? SubStr(name, 1, 14) "~" : name
+    namePad   := Format("{:-15s}", nameTrunc)
     line      := "[" label "] " namePad " "
     Loop arrows.Length {
         i     := A_Index
@@ -240,17 +244,19 @@ GetTipPos(&tx, &ty) {
 ; ============================================================
 ; LAYOUT CONSTANTS
 ; ============================================================
-global GW  := 420
-global PX  := 12
-global IW  := GW - PX * 2
-global LbW := 20    ; slot-number label width
-global CbX := PX + LbW + 4
-global CbW := GW - CbX - PX
+global GW      := 460
+global PX      := 12
+global IW      := GW - PX * 2
+global LbW     := 24    ; slot-number label width (fits "C+N")
+global CbX     := PX + LbW + 4
+global CbW     := GW - CbX - PX
+global LblFldW := 72    ; display-name override edit width
+global AdjCbW  := CbW - LblFldW - 4
 
 ; ============================================================
 ;  BUILD GFull  — config + HUD overlay
 ; ============================================================
-global GFull := Gui("+AlwaysOnTop -Caption")
+global GFull := Gui("+AlwaysOnTop -Caption -DPIScale")
 GFull.BackColor := "080812"
 GFull.MarginX   := 0
 GFull.MarginY   := 0
@@ -258,86 +264,138 @@ GFull.MarginY   := 0
 fy := 0
 
 ; ── top accent ───────────────────────────────────────────────
-GFull.Add("Text", "x0 y" fy " w" GW " h2 BackgroundFFD700")
+GFull.Add("Text", "x0 y0 w" GW " h2 BackgroundFFD700")
 fy += 2
 GFull.Add("Text", "x0 y" fy " w" GW " h1 Background4FC3F7")
 fy += 1
 
 ; ── title bar ────────────────────────────────────────────────
-GFull.Add("Text", "x0 y" fy " w" GW " h48 Background0B0B1C")
+GFull.Add("Text", "x0 y" fy " w" GW " h46 Background0B0B1C")
 GFull.SetFont("s10 Bold cFFD700", "Courier New")
-GFull.Add("Text", "x" PX " y" (fy+4) " w" (GW-50) " h15 Background0B0B1C",
+GFull.Add("Text", "x" PX " y" (fy+4) " w" (GW-PX-44) " h14 Background0B0B1C",
     "S.T.R.A.T.A.G.E.M.")
 GFull.SetFont("s6 c4A8A9A", "Courier New")
-GFull.Add("Text", "x" PX " y" (fy+21) " w" (GW-50) " h10 Background0B0B1C",
+GFull.Add("Text", "x" PX " y" (fy+20) " w" (GW-PX-44) " h10 Background0B0B1C",
     "SMART TRIGGER REGULATION AND TACTICAL ACTION")
-GFull.Add("Text", "x" PX " y" (fy+32) " w" (GW-50) " h10 Background0B0B1C",
-    "GUIDANCE EXECUTION MANAGER  //  v4.7  //  102 STRATAGEMS")
+GFull.Add("Text", "x" PX " y" (fy+31) " w" (GW-PX-44) " h10 Background0B0B1C",
+    "GUIDANCE EXECUTION MANAGER  //  v4.8.6  //  102 STRATAGEMS")
 GFull.SetFont("s11 Bold cC8A227", "Courier New")
-GFull.Add("Text", "x" (GW-42) " y" (fy+8) " w30 h30 Background0B0B1C", "✦")
-fy += 48
+GFull.Add("Text", "x" (GW-42) " y" (fy+7) " w30 h28 Background0B0B1C", "✦")
+fy += 46
 
+; ── gold separator ───────────────────────────────────────────
 GFull.Add("Text", "x0 y" fy " w" GW " h1 BackgroundC8A227")
 fy += 1
 
-; ── rapid fire note ──────────────────────────────────────────
-fy += 4
+; ── rapid fire warning ───────────────────────────────────────
+GFull.Add("Text", "x0 y" fy " w" GW " h12 Background0A0A16")
 GFull.SetFont("s6 cAA2222", "Courier New")
-GFull.Add("Text", "x" PX " y" fy " w" IW " h9 Center",
+GFull.Add("Text", "x" PX " y" (fy+1) " w" IW " h10 Center Background0A0A16",
     "! RAPID FIRE: avoid full-auto weapons  //  [End] to toggle")
-fy += 13
-GFull.Add("Text", "x0 y" fy " w" GW " h1 Background1A2A3A")
-fy += 4
+fy += 12
 
-; ── loadout header ───────────────────────────────────────────
-GFull.SetFont("s6 c3A7A8A", "Courier New")
-GFull.Add("Text", "x" PX " y" fy " w" IW " h9",
-    "LOADOUT  //  CTRL+1-9  //  SLOTS 3-9 CUSTOMIZABLE")
+; ── SETTINGS section ─────────────────────────────────────────
+GFull.Add("Text", "x0 y" fy " w" GW " h1 Background1A2A3A")
+fy += 1
+GFull.Add("Text", "x0 y" fy " w" GW " h14 Background0B1020")
+GFull.SetFont("s6 Bold cFFD700", "Courier New")
+GFull.Add("Text", "x" PX " y" (fy+2) " w80 h10 Background0B1020", "SETTINGS")
+GFull.SetFont("s6 c2A4A6A", "Courier New")
+GFull.Add("Text", "x" (GW-PX-110) " y" (fy+2) " w110 h10 Right Background0B1020",
+    "OPACITY")
 fy += 14
 
-; ── HARDCODED ROWS (1=Reinforce, 2=Resupply) ─────────────────
+; full opacity row
+GFull.Add("Text", "x0 y" fy " w" GW " h18 Background080810")
+GFull.SetFont("s6 c4A8A9A", "Courier New")
+GFull.Add("Text", "x" PX " y" (fy+4) " w28 h10 Background080810", "FULL")
+global FOpacVal := GFull.Add("Text",
+    "x" (GW-PX-24) " y" (fy+4) " w24 h10 Right c7AACBC Background080810", TR_FULL)
+global FOpacSlider := GFull.Add("Slider",
+    "x" (PX+32) " y" (fy+1) " w" (IW-58) " h16 Range50-255 TickInterval51",
+    TR_FULL)
+FOpacSlider.OnEvent("Change", ApplyOpacity)
+fy += 18
+
+; compact opacity row
+GFull.Add("Text", "x0 y" fy " w" GW " h18 Background080810")
+GFull.SetFont("s6 c4A8A9A", "Courier New")
+GFull.Add("Text", "x" PX " y" (fy+4) " w28 h10 Background080810", "COMP")
+global FCompOpacVal := GFull.Add("Text",
+    "x" (GW-PX-24) " y" (fy+4) " w24 h10 Right c7AACBC Background080810", TR_COMP)
+global FCompOpacSlider := GFull.Add("Slider",
+    "x" (PX+32) " y" (fy+1) " w" (IW-58) " h16 Range50-255 TickInterval51",
+    TR_COMP)
+FCompOpacSlider.OnEvent("Change", ApplyCompactOpacity)
+fy += 18
+
+fy += 3
+
+; ── LOADOUT section ──────────────────────────────────────────
+GFull.Add("Text", "x0 y" fy " w" GW " h1 Background1A2A3A")
+fy += 1
+GFull.Add("Text", "x0 y" fy " w" GW " h14 Background0B1020")
+GFull.SetFont("s6 Bold cFFD700", "Courier New")
+GFull.Add("Text", "x" PX " y" (fy+2) " w80 h10 Background0B1020", "LOADOUT")
+GFull.SetFont("s6 c2A4A6A", "Courier New")
+GFull.Add("Text", "x" (GW-PX-130) " y" (fy+2) " w130 h10 Right Background0B1020",
+    "CTRL+1-9  //  SLOTS 3-9")
+fy += 14
+
+; column labels
+GFull.Add("Text", "x0 y" fy " w" GW " h11 Background090914")
+GFull.SetFont("s5 c2A5A6A", "Courier New")
+GFull.Add("Text", "x" CbX " y" (fy+1) " w100 h9 Background090914", "STRATAGEM")
+GFull.Add("Text", "x" (CbX+AdjCbW+4) " y" (fy+1) " w" LblFldW " h9 Center Background090914",
+    "LABEL")
+fy += 11
+
+; hardcoded rows (Reinforce, Resupply)
 HardNames := ["Reinforce", "Resupply"]
 Loop 2 {
     i   := A_Index
-    rbg := (Mod(i, 2) = 0) ? "0C0C20" : "090916"
-    ; left stripe — red = locked
+    rbg := (Mod(i, 2) = 0) ? "0C0C1E" : "0A0A18"
     GFull.Add("Text", "x0 y" fy " w4 h20 BackgroundAA2222")
     GFull.Add("Text", "x4 y" fy " w" (GW-4) " h20 Background" rbg)
-    GFull.SetFont("s8 Bold cFFD700", "Courier New")
-    GFull.Add("Text", "x" PX " y" (fy+1) " w" LbW " h16 Background" rbg, i)
+    GFull.SetFont("s7 Bold cFFD700", "Courier New")
+    GFull.Add("Text", "x" PX " y" (fy+3) " w" LbW " h14 Background" rbg, i)
     GFull.SetFont("s7 c8A8AA0", "Courier New")
-    GFull.Add("Text", "x" CbX " y" (fy+3) " w" (CbW-36) " h13 Background" rbg,
-        HardNames[i])
-    GFull.SetFont("s5 c2A2A50", "Courier New")
-    GFull.Add("Text", "x" (GW-PX-32) " y" (fy+5) " w32 h9 Right Background" rbg,
+    GFull.Add("Text", "x" CbX " y" (fy+3) " w" AdjCbW " h14 Background" rbg, HardNames[i])
+    GFull.SetFont("s5 c2A2A55", "Courier New")
+    GFull.Add("Text", "x" (CbX+AdjCbW+4) " y" (fy+6) " w" LblFldW " h9 Center Background" rbg,
         "LOCKED")
     fy += 20
     GFull.Add("Text", "x0 y" fy " w" GW " h1 Background14142A")
     fy += 1
 }
 
-; thin section divider before custom slots
-GFull.Add("Text", "x4 y" fy " w" (GW-4) " h3 Background0D0D22")
-fy += 3
+; divider
+GFull.Add("Text", "x4 y" fy " w" (GW-4) " h2 Background0C0C1E")
+fy += 2
 
-; ── CUSTOM SLOT ROWS (3-9) ────────────────────────────────────
+; custom slot rows (C+3 through C+9)
 global Drops := []
 Loop 7 {
     j   := A_Index
     i   := j + 2
-    rbg := (Mod(i, 2) = 0) ? "0C0C20" : "090916"
-    ; left stripe — gold = custom
+    rbg := (Mod(i, 2) = 0) ? "0C0C1E" : "0A0A18"
     GFull.Add("Text", "x0 y" fy " w4 h20 BackgroundB8921E")
     GFull.Add("Text", "x4 y" fy " w" (GW-4) " h20 Background" rbg)
-    GFull.SetFont("s8 Bold c4FC3F7", "Courier New")
-    GFull.Add("Text", "x" PX " y" (fy+1) " w" LbW " h16 Background" rbg, i)
+    GFull.SetFont("s7 Bold c4FC3F7", "Courier New")
+    GFull.Add("Text", "x" PX " y" (fy+3) " w" LbW " h14 Background" rbg, "C+" i)
     GFull.SetFont("s7 cC8A850", "Courier New")
     d := GFull.Add("ComboBox",
-        "x" CbX " y" (fy+1) " w" CbW " h200 vStrat" i " Background0A0918 cC8C890",
+        "x" CbX " y" (fy+1) " w" AdjCbW " h200 vStrat" i " Background0A0918 cC8C890",
         StratNameList)
     d.OnEvent("Change", UpdateOverlayFromDrops)
     try DllCall("uxtheme\SetWindowTheme", "Ptr", d.Hwnd, "Str", "DarkMode_CFD", "Ptr", 0)
     Drops.Push(d)
+    GFull.SetFont("s7 c6A8A6A", "Courier New")
+    le := GFull.Add("Edit",
+        "x" (CbX+AdjCbW+4) " y" (fy+2) " w" LblFldW " h16 Background0A0918 c8ABB70")
+    SendMessage(0x1501, 1, StrPtr("label"), le.Hwnd)
+    le.OnEvent("Change", (*) => UpdateOverlay())
+    LabelEdits.Push(le)
     fy += 20
     if j < 7 {
         GFull.Add("Text", "x0 y" fy " w" GW " h1 Background14142A")
@@ -345,51 +403,50 @@ Loop 7 {
     }
 }
 
+; gold separator + deploy
 GFull.Add("Text", "x0 y" fy " w" GW " h1 BackgroundC8A227")
 fy += 1
-fy += 4
-
-; ── deploy button ────────────────────────────────────────────
+fy += 3
 GFull.SetFont("s7 Bold c22C55E", "Courier New")
 FSaveBtn := GFull.Add("Button", "x" PX " y" fy " w" IW " h20", ">> DEPLOY LOADOUT <<")
 FSaveBtn.OnEvent("Click", SaveLoadout)
-fy += 26
+try DllCall("uxtheme\SetWindowTheme", "Ptr", FSaveBtn.Hwnd, "Str", "DarkMode_Explorer", "Ptr", 0)
+fy += 24
 
-GFull.Add("Text", "x0 y" fy " w" GW " h1 BackgroundC8A227")
+; ── ACTIVE HUD section ───────────────────────────────────────
+GFull.Add("Text", "x0 y" fy " w" GW " h1 Background1A2A3A")
 fy += 1
-fy += 4
+GFull.Add("Text", "x0 y" fy " w" GW " h14 Background0B1020")
+GFull.SetFont("s6 Bold cFFD700", "Courier New")
+GFull.Add("Text", "x" PX " y" (fy+2) " w80 h10 Background0B1020", "ACTIVE HUD")
+GFull.SetFont("s6 c2A4A6A", "Courier New")
+GFull.Add("Text", "x" (GW-PX-110) " y" (fy+2) " w110 h10 Right Background0B1020",
+    "CTRL+0 SOS BEACON")
+fy += 14
 
-; ── active HUD ───────────────────────────────────────────────
-GFull.SetFont("s6 c3A7A8A", "Courier New")
-GFull.Add("Text", "x" PX " y" fy " w" IW " h9",
-    "ACTIVE HUD  //  CTRL+0 SOS BEACON")
-fy += 12
-
-GFull.Add("Text", "x0 y" fy " w" GW " h210 Background050508")
+GFull.Add("Text", "x0 y" fy " w" GW " h185 Background050508")
 GFull.SetFont("s8 Bold cFFD700", "Courier New")
 global FOverlay := GFull.Add("Text",
-    "x" PX " y" (fy+4) " w" IW " h202 Background050508", "")
-fy += 210
-
-GFull.Add("Text", "x0 y" fy " w" GW " h1 BackgroundC8A227")
-fy += 1
-fy += 4
+    "x" PX " y" (fy+4) " w" IW " h177 Background050508", "")
+fy += 185
 
 ; ── status bar ───────────────────────────────────────────────
+GFull.Add("Text", "x0 y" fy " w" GW " h1 BackgroundC8A227")
+fy += 1
 GFull.Add("Text", "x0 y" fy " w" GW " h18 Background07070F")
 GFull.SetFont("s6 Bold c22C55E", "Courier New")
 global FStatus := GFull.Add("Text",
-    "x" PX " y" (fy+3) " w70 h11 Background07070F", "ONLINE")
+    "x" PX " y" (fy+4) " w70 h10 Background07070F", "ONLINE")
 GFull.SetFont("s6 Bold cCC3333", "Courier New")
 global FRapid := GFull.Add("Text",
-    "x" (GW//2-38) " y" (fy+3) " w76 h11 Center Background07070F", "RAPID  O")
+    "x" (GW//2-38) " y" (fy+4) " w76 h10 Center Background07070F", "RAPID  O")
 GFull.SetFont("s6 c2A4A6A", "Courier New")
 GFull.Add("Text",
-    "x" (GW-130) " y" (fy+3) " w120 h11 Right Background07070F",
+    "x" (GW-PX-136) " y" (fy+4) " w136 h10 Right Background07070F",
     "[-]COMPACT  [END]RAPID")
 fy += 18
 
-; ── FOR SUPER-EARTH bar ──────────────────────────────────────
+; ── FOR SUPER-EARTH ──────────────────────────────────────────
 GFull.Add("Text", "x0 y" fy " w" GW " h1 Background2A5A8A")
 fy += 1
 GFull.Add("Text", "x0 y" fy " w" GW " h18 Background0C1525")
@@ -409,52 +466,59 @@ global FullH := fy
 ; ============================================================
 ;  BUILD GComp  — compact click-through HUD overlay
 ; ============================================================
-global GComp := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000")
+global GComp := Gui("+AlwaysOnTop -Caption -DPIScale +ToolWindow +E0x80000")
 GComp.BackColor := "080812"
 GComp.MarginX   := 0
 GComp.MarginY   := 0
 
 cy := 0
 
-GComp.Add("Text", "x0 y" cy " w" GW " h2 BackgroundFFD700")
+; ── top accent ───────────────────────────────────────────────
+GComp.Add("Text", "x0 y0 w" GW " h2 BackgroundFFD700")
 cy += 2
 GComp.Add("Text", "x0 y" cy " w" GW " h1 Background4FC3F7")
 cy += 1
 
+; ── compact title bar ────────────────────────────────────────
 GComp.Add("Text", "x0 y" cy " w" GW " h22 Background0B0B1C")
 GComp.SetFont("s7 Bold cFFD700", "Courier New")
 GComp.Add("Text", "x" PX " y" (cy+4) " w" (GW//2-PX) " h14 Background0B0B1C",
     "S.T.R.A.T.A.G.E.M.")
 GComp.SetFont("s6 c3A7A8A", "Courier New")
-GComp.Add("Text", "x" (GW//2) " y" (cy+6) " w" (GW//2-PX) " h9 Right Background0B0B1C",
+GComp.Add("Text", "x" (GW//2) " y" (cy+6) " w" (GW//2-PX) " h10 Right Background0B0B1C",
     "COMPACT  [-]")
 cy += 22
 
+; ── gold separator + padding ─────────────────────────────────
 GComp.Add("Text", "x0 y" cy " w" GW " h1 BackgroundC8A227")
-cy += 4
+cy += 1
+cy += 3
 
-GComp.Add("Text", "x0 y" cy " w" GW " h210 Background050508")
+; ── HUD overlay ──────────────────────────────────────────────
+GComp.Add("Text", "x0 y" cy " w" GW " h185 Background050508")
 GComp.SetFont("s8 Bold cFFD700", "Courier New")
 global COverlay := GComp.Add("Text",
-    "x" PX " y" (cy+4) " w" IW " h202 Background050508", "")
-cy += 210
+    "x" PX " y" (cy+4) " w" IW " h177 Background050508", "")
+cy += 185
 
+; ── status bar ───────────────────────────────────────────────
 GComp.Add("Text", "x0 y" cy " w" GW " h1 BackgroundC8A227")
-cy += 4
-
+cy += 1
+cy += 3
 GComp.Add("Text", "x0 y" cy " w" GW " h18 Background07070F")
 GComp.SetFont("s6 Bold c22C55E", "Courier New")
 global CStatus := GComp.Add("Text",
-    "x" PX " y" (cy+3) " w70 h11 Background07070F", "ONLINE")
+    "x" PX " y" (cy+4) " w70 h10 Background07070F", "ONLINE")
 GComp.SetFont("s6 Bold cCC3333", "Courier New")
 global CRapid := GComp.Add("Text",
-    "x" (GW//2-38) " y" (cy+3) " w76 h11 Center Background07070F", "RAPID  O")
+    "x" (GW//2-38) " y" (cy+4) " w76 h10 Center Background07070F", "RAPID  O")
 GComp.SetFont("s6 c2A4A6A", "Courier New")
 GComp.Add("Text",
-    "x" (GW-106) " y" (cy+3) " w96 h11 Right Background07070F",
+    "x" (GW-PX-118) " y" (cy+4) " w118 h10 Right Background07070F",
     "[-]FULL  [END]RAPID")
 cy += 18
 
+; ── FOR SUPER-EARTH ──────────────────────────────────────────
 GComp.Add("Text", "x0 y" cy " w" GW " h1 Background2A5A8A")
 cy += 1
 GComp.Add("Text", "x0 y" cy " w" GW " h18 Background0C1525")
@@ -463,6 +527,7 @@ GComp.Add("Text", "x0 y" (cy+3) " w" GW " h12 Center Background0C1525",
     "FOR SUPER-EARTH!")
 cy += 18
 
+; ── bottom accent ────────────────────────────────────────────
 GComp.Add("Text", "x0 y" cy " w" GW " h1 Background4FC3F7")
 cy += 1
 GComp.Add("Text", "x0 y" cy " w" GW " h2 BackgroundFFD700")
@@ -475,7 +540,7 @@ global CompH := cy
 ; ============================================================
 global IndW := 72
 global IndH := 14
-global GIndicator := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000")
+global GIndicator := Gui("+AlwaysOnTop -Caption -DPIScale +ToolWindow +E0x80000")
 GIndicator.BackColor := "0A0008"
 GIndicator.MarginX := 0
 GIndicator.MarginY := 0
@@ -536,6 +601,41 @@ if FileExist(LoadFile) {
         Drops[j].Text := name
         SetStratFromName(i, name)
     }
+    ; line 8 — saved opacity (v4.8.1)
+    if Lines.Length >= 8 {
+        raw := Trim(Lines[8])
+        if IsInteger(raw) {
+            val := Integer(raw)
+            if val >= 50 && val <= 255 {
+                TR_FULL := val
+                FOpacSlider.Value := val
+                FOpacVal.Value    := val
+            }
+        }
+    }
+    ; lines 9-10 — saved compact position (v4.8.2)
+    if Lines.Length >= 9 && IsInteger(Trim(Lines[9]))
+        CompactX := Integer(Trim(Lines[9]))
+    if Lines.Length >= 10 && IsInteger(Trim(Lines[10]))
+        CompactY := Integer(Trim(Lines[10]))
+    ; line 11 — saved compact opacity
+    if Lines.Length >= 11 {
+        raw := Trim(Lines[11])
+        if IsInteger(raw) {
+            val := Integer(raw)
+            if val >= 50 && val <= 255 {
+                TR_COMP := val
+                FCompOpacSlider.Value := val
+                FCompOpacVal.Value    := val
+            }
+        }
+    }
+    ; lines 12-18 — display name overrides (v4.8.4)
+    Loop 7 {
+        lineIdx := 11 + A_Index
+        if Lines.Length >= lineIdx
+            LabelEdits[A_Index].Value := Trim(Lines[lineIdx])
+    }
 } else {
     Loop 7 {
         j := A_Index
@@ -549,16 +649,14 @@ if FileExist(LoadFile) {
 ; ============================================================
 MonitorGetWorkArea(, &WALeft, &WATop, &WARight, &WABottom)
 UsableW := WARight - WALeft
-UsableH := WABottom - WATop
 Mrg     := Max(8, Round(UsableW * 0.01))
-
-Xpos := WARight - GW - Mrg
-Ypos := WATop + Max(Mrg, Round((UsableH - FullH) / 2))
-if (Ypos + FullH > WABottom - Mrg)
-    Ypos := Max(WATop, WABottom - FullH - Mrg)
+Xpos    := WARight - GW - Mrg
+Ypos    := WATop + Mrg
 
 GFull.Show("x" Xpos " y" Ypos " w" GW " h" FullH " NoActivate")
-GComp.Show("x" Xpos " y" Ypos " w" GW " h" CompH " NoActivate")
+CompXpos := (CompactX >= 0) ? CompactX : Xpos
+CompYpos := (CompactY >= 0) ? CompactY : Ypos
+GComp.Show("x" CompXpos " y" CompYpos " w" GW " h" CompH " NoActivate")
 GComp.Hide()
 
 WinSetTransparent(TR_FULL, GFull.Hwnd)
@@ -576,7 +674,7 @@ UpdateOverlay()
 ; SAVE
 ; ============================================================
 SaveLoadout(*) {
-    global Drops
+    global Drops, TR_FULL, CompactX, CompactY, GComp, LabelEdits
     Loop 7 {
         SetStratFromName(A_Index + 2, Drops[A_Index].Text)
     }
@@ -584,8 +682,16 @@ SaveLoadout(*) {
     Loop 7 {
         content .= Drops[A_Index].Text . "`n"
     }
+    content .= TR_FULL . "`n"
+    WinGetPos(&cx, &cy, , , GComp.Hwnd)
+    content .= cx . "`n"
+    content .= cy . "`n"
+    content .= TR_COMP
+    Loop 7 {
+        content .= "`n" LabelEdits[A_Index].Value
+    }
     f := FileOpen(LoadFile, "w")
-    f.Write(RTrim(content, "`n"))
+    f.Write(content)
     f.Close()
     UpdateOverlay()
     FlashDeploy()
@@ -595,12 +701,14 @@ SaveLoadout(*) {
 ; DISPLAY
 ; ============================================================
 UpdateOverlay() {
-    global ActiveSlot, ActiveStep, Strats, SOS, FOverlay, COverlay, Drops
+    global ActiveSlot, ActiveStep, Strats, SOS, FOverlay, COverlay, Drops, LabelEdits
     lines := ""
     Loop 9 {
-        i    := A_Index
-        seq  := Strats[i]
-        name := (i = 1) ? "Reinforce" : (i = 2) ? "Resupply" : Drops[i - 2].Text
+        i       := A_Index
+        seq     := Strats[i]
+        rawName := (i = 1) ? "Reinforce" : (i = 2) ? "Resupply" : Drops[i - 2].Text
+        lbl     := (i >= 3) ? Trim(LabelEdits[i - 2].Value) : ""
+        name    := (lbl != "") ? lbl : rawName
         lines .= BuildHUDLine(i, name, seq, (i = ActiveSlot ? ActiveStep : 0)) "`n"
     }
     lines .= "-- SOS -------------`n"
@@ -645,6 +753,20 @@ FlashHUD() {
     SetTimer(() => WinSetTransparent(TR_FULL, GFull.Hwnd), -130)
 }
 
+ApplyOpacity(*) {
+    global FOpacSlider, FOpacVal, TR_FULL, GFull
+    TR_FULL := FOpacSlider.Value
+    FOpacVal.Value := TR_FULL
+    WinSetTransparent(TR_FULL, GFull.Hwnd)
+}
+
+ApplyCompactOpacity(*) {
+    global FCompOpacSlider, FCompOpacVal, TR_COMP, GComp
+    TR_COMP := FCompOpacSlider.Value
+    FCompOpacVal.Value := TR_COMP
+    WinSetTransparent(TR_COMP, GComp.Hwnd)
+}
+
 ; ============================================================
 ; HOTKEYS — GLOBAL
 ; ============================================================
@@ -664,15 +786,19 @@ FlashHUD() {
 }
 
 *-:: {
-    global CompactMode, HUDVisible
+    global CompactMode, HUDVisible, CompactX, CompactY
     CompactMode := !CompactMode
     if HUDVisible {
         if CompactMode {
             WinGetPos(&wx, &wy, , , GFull.Hwnd)
             GFull.Hide()
-            GComp.Show("x" wx " y" wy " NoActivate")
+            startX := (CompactX >= 0) ? CompactX : wx
+            startY := (CompactY >= 0) ? CompactY : wy
+            GComp.Show("x" startX " y" startY " NoActivate")
         } else {
             WinGetPos(&wx, &wy, , , GComp.Hwnd)
+            CompactX := wx
+            CompactY := wy
             GComp.Hide()
             GFull.Show("x" wx " y" wy " NoActivate")
         }
