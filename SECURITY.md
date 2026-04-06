@@ -10,15 +10,15 @@ Only the latest released version receives security attention. Older versions are
 
 | Version | Supported |
 |---------|-----------|
-| 4.7.x (current) | Yes |
-| 4.6.x | No |
-| < 4.6 | No |
+| 4.8.x (current) | Yes |
+| 4.7.x | No |
+| < 4.7 | No |
 
 ---
 
 ## Scope
 
-This is a local AutoHotkey v2 script that runs entirely on your machine. It has no server component, no user accounts, no internet connectivity (in versions prior to 7.x), and does not transmit data externally. Security concerns are therefore narrow but real:
+This is a local AutoHotkey v2 script that runs entirely on your machine. It has no server component and no user accounts. Starting in v4.8.9, an **optional** outbound HTTPS request checks the GitHub Releases API for newer versions — this is disabled by default and only activates when the user manually sets the `UpdateURL` global variable. No user data is transmitted. Security concerns are therefore narrow but real:
 
 ### In Scope
 
@@ -86,9 +86,13 @@ The script uses `SendInput` and `SendEvent` to send directional keystrokes to th
 
 `.ahk` script files are not code-signed. You should only run scripts obtained directly from the official repository or that you have personally reviewed. Verify the file hash against the published release if in doubt.
 
+### Update Notifier (v4.8.9+)
+
+The optional update notifier makes a single outbound HTTPS GET request to the GitHub Releases API on startup (after a 3-second delay). It sends only a `User-Agent: STRATAGEM-Terminal` header and reads only the `tag_name` field from the JSON response. No user data, system information, or loadout data is transmitted. The request is wrapped in `try` and fails silently on any error. **This feature is disabled by default** — it only activates when the user manually sets the `UpdateURL` global variable to a GitHub API endpoint.
+
 ### Future Network Attack Surface
 
-Starting in the v6.x roadmap, features including a local web server (localhost:7447), LAN UDP broadcast, and optional GitHub API calls are planned. When these features ship, the security policy will be updated to reflect the expanded attack surface. Network features will be **opt-in and disabled by default**.
+Starting in the v6.x roadmap, features including a local web server (localhost:7447), LAN UDP broadcast, and expanded GitHub integration are planned. When these features ship, the security policy will be updated to reflect the expanded attack surface. Network features will be **opt-in and disabled by default**.
 
 ---
 
@@ -98,7 +102,7 @@ When the project publishes compiled `.exe` releases (planned for v6.7.x), SHA-25
 
 ```powershell
 # PowerShell
-Get-FileHash .\STRAGEM_TERMINAL_v4.7.exe -Algorithm SHA256
+Get-FileHash .\STRATAGEM_TERMINAL_v4.8.10.exe -Algorithm SHA256
 ```
 
 Compare the output against the checksum listed in the corresponding GitHub Release.
@@ -117,4 +121,4 @@ If you are security-conscious about running `.ahk` scripts:
 
 ---
 
-*Last updated: v4.7 release*
+*Last updated: v4.8.10 release*
