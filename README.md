@@ -1,12 +1,12 @@
 ```
 ╔══════════════════════════════════════════╗
-║  S.T.R.A.T.A.G.E.M.  T E R M I N A L   ║
-║         v 4 . 7   //   H D 2            ║
+║   S.T.R.A.T.A.G.E.M.  T E R M I N A L    ║
+║        v 4 . 8 . 1 0   //   H D 2        ║
 ╚══════════════════════════════════════════╝
 ```
 
 # S.T.R.A.T.A.G.E.M. TERMINAL
-## v4.7 - Smart Trigger Regulation And Tactical Action Guidance Execution Manager
+## v4.8.10 - Smart Trigger Regulation And Tactical Action Guidance Execution Manager
 
 ---
 
@@ -30,7 +30,15 @@
 - **Compact click-through overlay** - press `-` to collapse the config panel to a minimal HUD that passes all mouse input through to the game.
 - **HUD visibility controls** - press `=` to hide/show the entire HUD without closing the script. A tiny **RAPID ON** indicator persists in the top-right corner if rapid fire is still active while the HUD is hidden.
 - **Persistent loadout storage** - slot assignments are saved to `stratagem_loadout.ini` and restored on next launch.
-- **Live cast animation** - the active HUD line shows a step-by-step progress indicator as each directional key is sent.
+- **Live cast animation** - the active HUD line shows a step-by-step progress indicator as each directional key is sent, with a cyan pulse flash effect.
+- **DPI-aware rendering** - uses `-DPIScale` and `SetProcessDPIAware` for pixel-perfect display at any Windows scaling setting.
+- **6-position dock system** - choose from Top-Left, Top-Right, Mid-Left, Mid-Right, Bot-Left, Bot-Right startup positions via dropdown.
+- **Dual opacity sliders** - independent transparency controls for full and compact mode.
+- **Custom slot labels** - per-slot display name overrides (e.g., "Nuke" instead of "Eagle 500KG Bomb").
+- **Sequence reverse-lookup** - type a directional sequence to find the matching stratagem name.
+- **JSON export** - one-click clipboard copy of your loadout for sharing or backup.
+- **Auto-reload** - script monitors its own file and reloads automatically when saved.
+- **Update notifier** - optional GitHub release check on startup.
 
 ---
 
@@ -50,16 +58,18 @@
 2. **Download or clone** this repository to any local folder (e.g., `C:\Users\Owner\HellDiversMacros\`).
 3. Confirm the folder contains `Helldivers.ahk`.
 4. **Double-click `Helldivers.ahk`** to launch the script. An AHK icon will appear in the system tray.
-5. On first run, the HUD appears on the **right edge of your primary monitor**, vertically centered. A default loadout (Eagle Airstrike, Orbital Laser, Eagle 500KG Bomb, Patriot Exosuit, Expendable Anti-Tank, Recoilless Rifle, Jump Pack) is loaded into slots 3–9.
+5. On first run, the HUD appears docked to **Mid-Right** on your primary monitor. A default loadout (Eagle Airstrike, Orbital Laser, Eagle 500KG Bomb, Patriot Exosuit, Expendable Anti-Tank, Recoilless Rifle, Jump Pack) is loaded into slots 3–9.
 6. **Optional:** Right-click the system tray AHK icon and choose **Open** or configure it to run on startup via Task Scheduler or the Windows Startup folder.
+7. **Optional:** Set the `UpdateURL` global variable (line 39) to your GitHub releases API URL to enable automatic update checking on startup.
 
 ---
 
 ## SECTION 4: Quick Start
 
-1. **Launch the script** - the full config panel appears docked to the right side of your screen.
-2. **Assign your loadout** - use the dropdown boxes in slots 3–9 to select stratagems. Type in the box to filter by name.
-3. **Click `>> DEPLOY LOADOUT <<`** - this saves your choices to `stratagem_loadout.ini` and flashes the status bar with **DEPLOYED!**
+1. **Launch the script** - the full config panel appears docked to your selected position (default: Mid-Right).
+2. **Assign your loadout** - use the dropdown boxes in slots 3–9 to select stratagems. Type in the box to filter by name. Optionally type a short label in the LABEL field (e.g., "Nuke").
+3. **Click `>> DEPLOY <<`** - this saves your choices to `stratagem_loadout.ini` and flashes the status bar with **DEPLOYED!**
+3b. **Click `EXPORT JSON`** - copies your 7-slot loadout as a JSON string to the clipboard for sharing.
 4. **Launch Helldivers 2** and focus the game window.
 5. **Hold `Ctrl` and press a number key** (0–9) to cast the corresponding stratagem.
 6. **Press `-`** to switch to compact mode (click-through overlay only) when you no longer need the config panel.
@@ -126,10 +136,10 @@ The **DEPLOY LOADOUT** button writes all 7 custom slot names to `stratagem_loado
 The HUD operates in three distinct visual states:
 
 ### 1. Full Mode (Default)
-The complete config panel is visible - title bar, hardcoded slot rows, 7 custom dropdown rows, the DEPLOY LOADOUT button, the active HUD readout, the status bar, and the FOR SUPER-EARTH footer. The panel is **non-moveable** by design (WM_NCHITTEST is blocked) and docks to the right side of the screen, vertically centered using `MonitorGetWorkArea`. Transparency is set to 230/255.
+The complete config panel is visible - title bar, settings section (opacity sliders, dock position, sequence lookup), hardcoded slot rows, 7 custom dropdown rows with label overrides, the DEPLOY/EXPORT buttons, the active HUD readout, the status bar, and the FOR SUPER-EARTH footer. The panel is **non-moveable** by design (WM_NCHITTEST is blocked) and docks to one of 6 preset positions selectable via the DOCK dropdown. DPI scaling is disabled (`-DPIScale` + `SetProcessDPIAware`) for pixel-perfect rendering. Transparency is adjustable via the FULL opacity slider (default 230/255).
 
 ### 2. Compact Mode (press `-`)
-Pressing `-` hides the full config panel and shows the **GComp** overlay - a compact, always-on-top, click-through window (`+E0x80000` extended style) showing only the HUD readout and status bar. The overlay is **fully click-through**: all mouse input passes to whatever is beneath it in the game. Transparency is set to 130/255. Pressing `-` again returns to Full Mode; the window position is preserved between transitions.
+Pressing `-` hides the full config panel and shows the **GComp** overlay - a compact, always-on-top, click-through window (`+E0x80000` extended style) showing only the HUD readout and status bar. The overlay is **fully click-through**: all mouse input passes to whatever is beneath it in the game. Transparency is adjustable via the COMP opacity slider (default 130/255). The compact overlay always appears at the same dock position as the full panel — pressing `-` again returns to Full Mode at the same position.
 
 ### 3. Hidden Mode (press `=`)
 Both GFull and GComp are hidden. The HUD is completely invisible. If **Rapid Fire is ON**, a small **RAPID ON** indicator window (GIndicator) appears in the top-right corner of the screen as a reminder that the mode is still active. Pressing `=` again restores whichever mode (Full or Compact) was previously visible.
@@ -307,7 +317,17 @@ Arrow notation key: `^` = Up, `v` = Down, `<` = Left, `>` = Right
 ## SECTION 10: Configuration Files
 
 ### `stratagem_loadout.ini`
-Stores the names assigned to custom slots 3–9, one entry per line (7 lines total). The file is plain text with no section headers. It is created automatically when you click **DEPLOY LOADOUT** for the first time.
+Stores the complete loadout state as a plain text file with no section headers (19 lines). It is created automatically when you click **DEPLOY** for the first time.
+
+| Line(s) | Content |
+|---------|---------|
+| 1–7 | Custom slot names (slots 3–9) |
+| 8 | Full GUI opacity (integer 50–255) |
+| 9 | Compact overlay X position (legacy, not used for positioning) |
+| 10 | Compact overlay Y position (legacy, not used for positioning) |
+| 11 | Compact overlay opacity (integer 50–255) |
+| 12–18 | Display name overrides for slots 3–9 |
+| 19 | Dock preset (integer 1–6: TL/TR/ML/MR/BL/BR) |
 
 Example contents:
 ```
@@ -318,9 +338,21 @@ Patriot Exosuit
 Expendable Anti-Tank
 Recoilless Rifle
 Jump Pack
+230
+1460
+210
+130
+Nuke
+
+AT
+
+
+Sentry
+
+4
 ```
 
-On startup, if this file exists, slot names are read from it and matched against the stratagem database to resolve sequences. If the file is absent, the `DefaultSlots` array in the script provides the first-run defaults.
+On startup, if this file exists, all fields are read and applied. Missing lines are silently skipped and defaults are used. If the file is absent, the `DefaultSlots` array in the script provides the first-run defaults.
 
 ### `Helldivers.ahk`
 The main script file. To change first-run defaults (the loadout used when no `.ini` file is present), edit the `DefaultSlots` array near the top of the file:
@@ -348,7 +380,7 @@ Each entry must exactly match a `Name` field in the `Stratagems` array, or it wi
 | HUD not visible | Script is not running, or HUD was hidden with `=` | Check the system tray for the AHK icon. Press `=` to toggle visibility back on. |
 | Stratagems not casting | Game window is not focused, or Ctrl key state is misread | Click the game window to give it focus. Ensure no other program is intercepting `Ctrl`. |
 | Wrong stratagem sequence | Slot name in `.ini` does not match a database entry exactly | Open the dropdown for that slot, reselect the correct stratagem, and click DEPLOY LOADOUT. |
-| HUD running off screen | Non-standard monitor resolution or DPI scaling | The script uses `MonitorGetWorkArea` to position itself; ensure your primary monitor is set correctly in Windows Display Settings. |
+| HUD running off screen | Monitor work area detection issue | The script uses `MonitorGetWorkArea` with `-DPIScale` and `SetProcessDPIAware` for accurate positioning. Try a different dock preset (DOCK dropdown in Settings). |
 | Rapid fire not working | Rapid fire requires `helldivers2.exe` to be the active window | Click the game window to bring it to the foreground, then re-toggle with `End`. |
 | Script not running | AutoHotkey v1 is installed instead of v2, or `#Requires` check failed | Uninstall AHK v1 and install AHK v2 from https://www.autohotkey.com/. Right-click `Helldivers.ahk` and choose **Run with** > **AutoHotkey v2**. |
 
@@ -358,9 +390,12 @@ Each entry must exactly match a `Name` field in the `Stratagems` array, or it wi
 
 ```
 HellDiversMacros/
-├── Helldivers.ahk          # Main script
-├── stratagem_loadout.ini   # Saved loadout (auto-created on first DEPLOY)
-└── README.md               # This file
+├── Helldivers.ahk          # Main script (v4.8.10)
+├── stratagem_loadout.ini   # Saved loadout + settings (auto-created on first DEPLOY)
+├── README.md               # This file
+├── RELEASE.md              # Release notes
+├── LICENSE.md              # License and liability disclaimer
+└── SECURITY.md             # Security policy and vulnerability reporting
 ```
 
 ---
@@ -372,37 +407,37 @@ HellDiversMacros/
 
 ---
 
-### v4.8.x - Polish & Reliability
+### v4.8.x - Polish & Reliability ✅ COMPLETE
 
-#### v4.8.1 - HUD Opacity Slider
+#### v4.8.1 - HUD Opacity Slider ✅
 - Real-time opacity slider in the config panel. Drag to set HUD transparency anywhere from 50 to 255 without restarting the script.
 
-#### v4.8.2 - Compact Mode Position Memory
-- Compact overlay remembers its last dragged screen position across script restarts, written to `stratagem_loadout.ini` as `CompactX` and `CompactY` keys.
+#### v4.8.2 - Compact Mode Position Memory ✅
+- Compact overlay position is tied to the dock preset. Both full and compact modes always appear at the same dock position.
 
-#### v4.8.3 - Per-Slot Hotkey Label
-- Each slot row in the HUD displays the assigned hotkey (e.g., `Ctrl+5`) inline next to the slot number for quick reference.
+#### v4.8.3 - Per-Slot Hotkey Label ✅
+- Each slot row in the HUD displays the assigned hotkey (e.g., `[C+5]`) inline next to the slot number for quick reference.
 
-#### v4.8.4 - Slot Display Name Override
+#### v4.8.4 - Slot Display Name Override ✅
 - A secondary input field per slot allows you to type a custom short label (e.g., "Nuke") that displays in the HUD instead of the full stratagem name.
 
-#### v4.8.5 - Startup Position Option
-- A config dropdown allows selecting the initial docking position on launch: **Right Edge**, **Left Edge**, **Top-Right**, **Top-Left**, **Bottom-Right**, or **Center**.
+#### v4.8.5 - Startup Position Option ✅
+- A config dropdown (DOCK) allows selecting the initial docking position on launch: **Top-Left**, **Top-Right**, **Mid-Left**, **Mid-Right**, **Bot-Left**, or **Bot-Right**. Saved to INI and restored on restart.
 
-#### v4.8.6 - Auto-Reload Watch
-- The script monitors its own `.ahk` file for modification timestamps. If the file changes on disk, it automatically reloads without requiring `Ctrl+Alt+D`.
+#### v4.8.6 - Auto-Reload Watch ✅
+- The script monitors its own `.ahk` file for modification timestamps every 2 seconds. If the file changes on disk, it automatically reloads without requiring `Ctrl+Alt+D`.
 
-#### v4.8.7 - Cast Flash Animation Improvement
-- The active slot highlight during casting changes from a plain white flash to a brief **cyan pulse** (`4FC3F7`) that fades over 200 ms for better visibility.
+#### v4.8.7 - Cast Flash Animation Improvement ✅
+- The active slot highlight during casting changes from a plain white flash to a brief **cyan pulse** (`4FC3F7`) that fades through muted blue-grey (`2A9ABB`) over 200 ms before returning to gold.
 
-#### v4.8.8 - Config Export to Clipboard
-- A one-click button in the config panel copies the current 7-slot loadout as a JSON string to the clipboard (e.g., `{"slots":["Eagle Airstrike","Orbital Laser",...]}`) for sharing or backup.
+#### v4.8.8 - Config Export to Clipboard ✅
+- The **EXPORT JSON** button copies the current 7-slot loadout as a JSON string to the clipboard (e.g., `{"slots":["Eagle Airstrike","Orbital Laser",...]}`) for sharing or backup. Status bar flashes "COPIED!" for 1.5 seconds.
 
-#### v4.8.9 - In-App Update Notifier
-- On startup, the script silently checks the configured GitHub releases page. If a newer version tag is detected, a small yellow banner appears in the status bar: **"v4.8.9 available - github.com/..."**
+#### v4.8.9 - In-App Update Notifier ✅
+- On startup (3-second delay), the script silently checks the configured GitHub releases API URL. If a newer version tag is detected, the status bar shows **"vX.X.X!"** in yellow. Set the `UpdateURL` global variable to activate. Fails silently if URL is empty or unreachable.
 
-#### v4.8.10 - Sequence Reverse-Lookup
-- A search field in the config panel accepts a full directional sequence (e.g., `Up,Down,Right,Left,Up`) and displays the matching stratagem name, useful for identifying sequences seen in community content.
+#### v4.8.10 - Sequence Reverse-Lookup ✅
+- A LOOKUP field in the Settings section accepts a full directional sequence (e.g., `Up,Down,Right,Left,Up`) and displays the matching stratagem name in green, or "No match" in red. Uses the full 102-entry database.
 
 ---
 
@@ -476,8 +511,8 @@ HellDiversMacros/
 
 ### v5.1.x - GUI Scaling & Display
 
-#### v5.1.1 - DPI-Aware Rendering
-- All GUI element sizes are computed from the OS DPI setting, fixing layout proportions at 125%, 150%, and 200% Windows display scaling without manual adjustment.
+#### v5.1.1 - DPI-Aware Rendering ✅ (implemented early in v4.8.x)
+- All GUI windows use `-DPIScale` and `DllCall("SetProcessDPIAware")` for pixel-perfect rendering at any Windows display scaling setting. Implemented ahead of schedule as part of the v4.8.x DPI fix.
 
 #### v5.1.2 - Window Size Presets
 - Three single-click presets: **Small (320px)**, **Standard (420px)**, and **Wide (560px)** adjust the HUD width and reposition it to the right edge automatically.
@@ -1472,6 +1507,7 @@ HellDiversMacros/
 | **v4.5** | RAPID ON indicator added for hidden mode: small persistent top-right dot when rapid fire is active but HUD is hidden. |
 | **v4.6** | Loadout expanded to 9 slots; Slot 0 hardcoded to SOS Beacon. |
 | **v4.7** | Stratagems refactored from flat arrays to object array with `{Name, Keys}` properties. Database expanded to **102 entries**. GUI overhauled to 420px width with colored left-stripe slot rows, dark ComboBox theming via `SetWindowTheme`, and enhanced status bar. |
+| **v4.8.1–4.8.10** | Full polish pass: dual opacity sliders, per-slot hotkey labels and display name overrides, 6-position dock system, auto-reload file watcher, cyan cast flash animation, JSON loadout export, GitHub update notifier, sequence reverse-lookup field. DPI rendering fixed with `-DPIScale` + `SetProcessDPIAware`. GUI width expanded to 460px. Compact mode locked to dock position. |
 
 ---
 
